@@ -1,17 +1,17 @@
 package org.jliszka.quantum
 
 trait Convertable[B1 <: Basis, B2 <: Basis] {
-  def convert(b: B1): W.Q[B2]
+  def convert(b: B1): Q[B2]
 }
 
 object Convertable {
-  import W._
+  import Q._
   import Basis._
 
   implicit object SignIsConvertable extends Convertable[Std, Sign] {
     def convert(b: Std): Q[Sign] = b match {
-      case S0 => W(S_+ -> rhalf, S_- -> rhalf)
-      case S1 => W(S_+ -> rhalf, S_- -> -rhalf)
+      case S0 => Q(S_+ -> rhalf, S_- -> rhalf)
+      case S1 => Q(S_+ -> rhalf, S_- -> -rhalf)
     }
   }
 
@@ -21,7 +21,7 @@ object Convertable {
 
   implicit def sym[B1 <: Basis, B2 <: Basis](implicit from: Convertable[B2, B1], enum: Enumerable[B2]): Convertable[B1, B2] = new Convertable[B1, B2] {
     override def convert(b1: B1): Q[B2] = {
-      W(enum.vectors.map(b2 => b2 -> from.convert(b2)(b1).conj): _*)
+      Q(enum.vectors.map(b2 => b2 -> from.convert(b2)(b1).conj): _*)
     }
   }
 

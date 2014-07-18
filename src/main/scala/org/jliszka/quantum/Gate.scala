@@ -1,17 +1,17 @@
 package org.jliszka.quantum
 
-case class Operator[A, B](f: A => W[A, B]) {
-  def +(g: A => W[A, B]): A => W[A, B] = (a: A) => f(a) + g(a)
-  def -(g: A => W[A, B]): A => W[A, B] = (a: A) => f(a) - g(a)
-  def *(z: B): A => W[A, B] = (a: A) => f(a) * z
+case class Operator[A, B](f: A => Q[B]) {
+  def +(g: A => Q[B]): A => Q[B] = (a: A) => f(a) + g(a)
+  def -(g: A => Q[B]): A => Q[B] = (a: A) => f(a) - g(a)
+  def *(z: Complex): A => Q[B] = (a: A) => f(a) * z
 }
 object Operator {
-  implicit def functionToOperator[A, B](f: A => W[A, B]): Operator[A, B] = Operator(f)
-  implicit def operatorToFunction[A, B](op: Operator[A, B]): A => W[A, B] = op.f
+  implicit def functionToOperator[A, B](f: A => Q[B]): Operator[A, B] = Operator(f)
+  implicit def operatorToFunction[A, B](op: Operator[A, B]): A => Q[B] = op.f
 }
 
 object Gate {
-  import W.{pure, rhalf, Q}
+  import Q._
   import Basis._
 
   type U[A] = A => Q[A]
@@ -19,8 +19,8 @@ object Gate {
   // Some pure states
   val s0: Q[Std] = pure(S0)
   val s1: Q[Std] = pure(S1)
-  val plus: Q[Std] = W(S0 -> rhalf, S1 -> rhalf)
-  val minus: Q[Std] = W(S0 -> rhalf, S1 -> -rhalf)
+  val plus: Q[Std] = Q(S0 -> rhalf, S1 -> rhalf)
+  val minus: Q[Std] = Q(S0 -> rhalf, S1 -> -rhalf)
 
   val s_+ = pure(S_+)
   val s_- = pure(S_-)
@@ -57,8 +57,8 @@ object Gate {
   // Rotation gate
   val tau = 2 * math.Pi
   def rot(theta: Double)(b: Std): Q[Std] = b match {
-    case S0 => W(S0 -> math.cos(theta), S1 -> math.sin(theta))
-    case S1 => W(S0 -> -math.sin(theta), S1 -> math.cos(theta))
+    case S0 => Q(S0 -> math.cos(theta), S1 -> math.sin(theta))
+    case S1 => Q(S0 -> -math.sin(theta), S1 -> math.cos(theta))
   }
 
   // Square root of NOT gate

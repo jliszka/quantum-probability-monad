@@ -1,58 +1,55 @@
 package org.jliszka.quantum
 
-case class W[A, B](state: (A, B)*)(implicit num: Numeric[B], num2: Numeric2[B], ord: Ordering[A] = null) {
+case class Q[A](state: (A, Complex)*)(implicit ord: Ordering[A] = null) {
   private val rand = new scala.util.Random()
-  import num._
   private val _m = state.toMap
-  def apply(a: A): B = _m.getOrElse(a, num.zero)
+  def apply(a: A): Complex = _m.getOrElse(a, Complex.zero)
 
-  def map[A1](f: A => A1)(implicit ord1: Ordering[A1] = null): W[A1, B] = {
-    W(state.map{ case (a, b) => (f(a), b) }: _*).collect.normalize
+  def map[B](f: A => B)(implicit ord1: Ordering[B] = null): Q[B] = {
+    Q(state.map{ case (a, z) => (f(a), z) }: _*).collect.normalize
   }
 
-  def mapV[B1: Numeric: Numeric2](f: B => B1): W[A, B1] = {
-    W(state.map{ case (a, b) => (a, f(b)) }: _*)
+  def mapV(f: Complex => Complex): Q[A] = {
+    Q(state.map{ case (a, z) => (a, f(z)) }: _*)
   }
 
-  def flatMap[A1](f: A => W[A1, B]): W[A1, B] = {
-    W(state.flatMap{ case (a, b) => f(a).mapV(_ * b).state }: _*).collect.normalize
+  def flatMap[B](f: A => Q[B]): Q[B] = {
+    Q(state.flatMap{ case (a, z) => f(a).mapV(_ * z).state }: _*).collect.normalize
   }
 
-  def >>=[A1](f: A => W[A1, B]): W[A1, B] = this.flatMap(f)
+  def >>=[B](f: A => Q[B]): Q[B] = this.flatMap(f)
 
   // Collect like terms and sum their coefficients
-  def collect: W[A, B] = {
-    W(state.groupBy(_._1).toList.map{ case (a1, abs) => (a1, abs.map(_._2).sum) }: _*)
+  def collect: Q[A] = {
+    Q(state.groupBy(_._1).toList.map{ case (a, azs) => (a, azs.map(_._2).sum) }: _*)
   }
 
-  def scale(x: Double) = {
-    W(state.map{ case (a, b) => (a, num2.scale(b, x)) }: _*)
-  }
-  def unary_- = this.scale(-1.0)
+  def unary_- = this * -1.0
 
-  def *(x: B) = this.mapV(_ * x)
-  def +(that: W[A, B]) = W(this.state ++ that.state :_*).collect
-  def -(that: W[A, B]) = this + that.scale(-1.0)
+  def *(z: Complex) = this.mapV(_ * z)
+  def /(z: Complex) = this.mapV(_ / z)
+  def +(that: Q[A]) = Q(this.state ++ that.state :_*).collect
+  def -(that: Q[A]) = this + -that
 
-  def filter(f: A => Boolean): W[A, B] = {
-    W(state.filter{ case (a, b) => f(a) }: _*).normalize
+  def filter(f: A => Boolean): Q[A] = {
+    Q(state.filter{ case (a, z) => f(a) }: _*).normalize
   }
 
   // Make sure the sum of the squares of the coefficients is 1
   def normalize = {
-    val total = math.sqrt(state.map{ case (a, b) => num2.norm(b) }.sum)
-    this.scale(1 / total)
+    val total = math.sqrt(state.map{ case (a, z) => z.norm2 }.sum)
+    this / total
   }
 
   def toDist: List[(A, Double)] = {
-    this.state.toList.map{ case (a, b) => a -> num2.norm(b) }
+    this.state.toList.map{ case (a, z) => a -> z.norm2 }
   }
 
   def hist(implicit ord: Ordering[A]) {
     plotHist(this.toDist)
   }
 
-  private def plotHist[A1](values: Seq[(A1, Double)])(implicit ord: Ordering[A1]) {
+  private def plotHist[B](values: Seq[(B, Double)])(implicit ord: Ordering[B]) {
     val maxWidth = values.map(_._1.toString.size).max
     val maxValue = values.map(_._2).max
     val hashesPerUnit = 50 / maxValue
@@ -63,10 +60,10 @@ case class W[A, B](state: (A, B)*)(implicit num: Numeric[B], num2: Numeric2[B], 
     }}    
   }
 
-  case class Measurement[A, B, C](outcome: A, newState: W[B, C])
+  case class Measurement[A, B](outcome: B, newState: Q[A])
 
   // Measure a quantum state (or a part of one). Returns the outcome of the measurement and the new state.
-  def measure[A1](w: A => A1 = identity[A] _): Measurement[A1, A, B] = {
+  def measure[B](w: A => B = identity[A] _): Measurement[A, B] = {
     val r = rand.nextDouble()
     def find(r: Double, s: List[(A, Double)]): A = s match {
       case (l, p) :: Nil => l
@@ -79,39 +76,34 @@ case class W[A, B](state: (A, B)*)(implicit num: Numeric[B], num2: Numeric2[B], 
     Measurement(outcome, newState)
   }
 
-  def simulate[A1](n: Int, w: A => A1 = identity[A] _)(implicit ord: Ordering[A1]) {
+  def simulate[B](n: Int, w: A => B = identity[A] _)(implicit ord: Ordering[B]) {
     val measurements = (1 to n).map(_ => this.measure(w).outcome).groupBy(x => x).mapValues(_.size.toDouble)
-    val basis = this.state.map{ case (a, b) => w(a) }.distinct
+    val basis = this.state.map{ case (a, z) => w(a) }.distinct
     plotHist(basis.map(b => b -> measurements.getOrElse(b, 0.0)))
   }
 
-  def inner(other: W[A, B]) = {
+  def inner(other: Q[A]): Complex = {
     val m = other.state.toMap
     (for {
       (l, v1) <- state
       v2 <- m.get(l)
-    } yield num2.conj(v1) * v2).sum
+    } yield v1.conj * v2).sum
   }
 
-  def outer(other: W[A, B]) = {
+  def outer(other: Q[A]): A => Q[A] = {
     val m = other.state.toMap
-    (a: A) => this * num2.conj(m.getOrElse(a, num.zero))
+    (a: A) => this * m.getOrElse(a, Complex.zero).conj
   }
 
   override def toString = {
-    val filtered = state.filter{ case (a, b) => num2.norm(b) > 0.00000001 }
-    val sorted = if (ord == null) filtered.sortBy{ case (a, b) => a.toString } else filtered.sortBy{ case (a, b) => a }
-    sorted.map{ case (a, b) => s"$b|$a>"}.mkString(" + ")
+    val filtered = state.filter{ case (a, z) => z.norm2 > 0.00000001 }
+    val sorted = if (ord == null) filtered.sortBy{ case (a, z) => a.toString } else filtered.sortBy{ case (a, z) => a }
+    sorted.map{ case (a, z) => s"$z|$a>"}.mkString(" + ")
   }
 }
 
-object W {
-  type Q[A] = W[A, Complex]
+object Q {
   val rhalf: Complex = math.sqrt(0.5)
   val rquarter: Complex = math.sqrt(0.25)
-  def pure[A](a: A): Q[A] = new W(a -> Complex.one)
+  def pure[A](a: A): Q[A] = new Q(a -> Complex.one)
 }
-
-
-
-

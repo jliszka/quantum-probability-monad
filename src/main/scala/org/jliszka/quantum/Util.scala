@@ -1,8 +1,8 @@
 package org.jliszka.quantum
 
 object Util {
-  import W._
-  import Gate.{U}
+  import Q._
+  import Gate.U
   import Basis._
   import Util._
 
@@ -24,7 +24,7 @@ object Util {
   def adjoint[B1 <: Basis, B2 <: Basis, B3 <: Basis](u: B1 => Q[B2])(implicit c31: Convertable[B3, B1], c23: Convertable[B2, B3], e3: Enumerable[B3]): B2 => Q[B1] = {
     def adjointEnum(u: B3 => Q[B3])(b3: B3): Q[B3] = {
       val basis = e3.vectors
-      W(basis.map(b => b -> u(b)(b3).conj): _*)
+      Q(basis.map(b => b -> u(b)(b3).conj): _*)
     }
     (b2: B2) => pure(b2) >>= c23.convert >>= adjointEnum({ (b3: B3) => pure(b3) >>= c31.convert >>= u >>= c23.convert }) >>= c31.convert
   }    

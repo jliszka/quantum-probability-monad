@@ -2,7 +2,7 @@ package org.jliszka.quantum
 
 object Examples {
   import Complex._
-  import W._
+  import Q._
   import Basis._
   import Gate._
   import Convertable._
@@ -13,8 +13,8 @@ object Examples {
   def runHZHequalsX(s: Q[Std]): (Q[Std], Q[Std]) = (HZH(s), s >>= X)
 
   // Some convenient states for testing
-  val state1: Q[Std] = W(S0 -> 0.6, S1 -> 0.8.i)
-  val state2: Q[Std] = W(S0 -> -0.5, S1 -> rquarter)
+  val state1: Q[Std] = Q(S0 -> 0.6, S1 -> 0.8.i)
+  val state2: Q[Std] = Q(S0 -> -0.5, S1 -> rquarter)
 
   def mkBell(s: T[Std, Std]): Q[T[Std, Std]] = pure(s) >>= lift1(H) >>= cnot
   def mkBell2(s: T[Std, Std]): Q[T[Std, Std]] = pure(s) >>= cnot >>= lift1(H)
@@ -29,7 +29,7 @@ object Examples {
   def QFT(b: L[Std]): Q[L[Std]] = {
     val w = Complex.polar(1.0, tau / b.N)
     val base = w ^ L.toInt(b)
-    W((0 until b.N).map(i => L.fromInt(i, b.n) -> (base ^ i)): _*).normalize
+    Q((0 until b.N).map(i => L.fromInt(i, b.n) -> (base ^ i)): _*).normalize
   }
 
   // Quantum teleportation
@@ -149,10 +149,10 @@ object Examples {
     
     case class Detector(n: Int) extends Basis(n.toString)
 
-    val emit: Q[Unit] = W(() -> one)
+    val emit: Q[Unit] = pure(())
 
     def slit(q: Unit): Q[Slit] = {
-      W(A -> rhalf, B -> rhalf)
+      Q(A -> rhalf, B -> rhalf)
     }
 
     def evolve(slit: Slit): Q[Detector] = {
@@ -169,7 +169,7 @@ object Examples {
         Detector(detector) -> amplitude
       }
 
-      W(ws: _*)
+      Q(ws: _*)
     }
 
     val state: Q[Detector] = emit >>= slit >>= evolve
@@ -189,12 +189,12 @@ object Examples {
 
     case class Detector(n: Int) extends Basis(n.toString)
 
-    val emit: Q[Polarization] = W(Horizontal -> rhalf, Vertical -> rhalf)
+    val emit: Q[Polarization] = Q(Horizontal -> rhalf, Vertical -> rhalf)
 
     def copy[S <: Basis](s: S): Q[T[S, S]] = tensor(pure(s), pure(s))
 
     def slit[S <: Basis](s: S): Q[T[Slit, S]] = {
-      tensor(W(A -> rhalf, B -> rhalf), pure(s))
+      tensor(Q(A -> rhalf, B -> rhalf), pure(s))
     }
 
     def filter(q: T[Slit, Polarization]): Q[T[Slit, Polarization]] = {
@@ -221,7 +221,7 @@ object Examples {
         Detector(detector) -> amplitude
       }
 
-      W(ws: _*)
+      Q(ws: _*)
     }
 
     val state: Q[T[Detector, T[Polarization, Polarization]]] = {
