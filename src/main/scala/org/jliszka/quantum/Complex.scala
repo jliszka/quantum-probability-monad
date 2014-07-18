@@ -1,3 +1,5 @@
+package org.jliszka.quantum
+
 import scala.annotation.tailrec
 
 case class Complex(val re: Double, val im: Double) {
