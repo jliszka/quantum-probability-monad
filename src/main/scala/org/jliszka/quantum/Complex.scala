@@ -27,10 +27,13 @@ case class Complex(val re: Double, val im: Double) {
   def cos = (this.rot90.exp + (this.rot90 * -1).exp) / 2
   def sin = (this.rot90.exp - (this.rot90 * -1).exp) / Complex(0, 2.0)
  
+  private val df = new java.text.DecimalFormat("#.#######")
   override def toString = {
-    if (math.abs(im) < 0.00001) "%f".format(re)
-    else if (math.abs(re) < 0.00001) "%fi".format(im)
-    else "%f + %fi".format(re, im)
+    val reStr = df.format(re)
+    val imStr = df.format(im) + "i"
+    if (math.abs(im) < 0.00001) reStr
+    else if (math.abs(re) < 0.00001) imStr
+    else s"$reStr + $imStr"
   }
 }
 

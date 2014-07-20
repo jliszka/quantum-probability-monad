@@ -17,7 +17,7 @@ object Basis {
   case object S_- extends Sign("-")
 
   // Tensor product of two bases, e.g., T[Std, Std] = { |00>, |01>, |10>, |11> }
-  case class T[+B1 <: Basis, +B2 <: Basis](_1: B1, _2: B2) extends Basis(_1.label + _2.label)
+  case class T[+B1 <: Basis, +B2 <: Basis](_1: B1, _2: B2) extends Basis(_1.label + "," + _2.label)
 
   case class L[B <: Basis](ls: List[B]) extends Basis(ls.map(_.label).mkString) {
     val n = ls.length

@@ -1,12 +1,13 @@
 package org.jliszka.quantum
 
+import org.jliszka.quantum.Q._
+import org.jliszka.quantum.Basis._
+
 trait Convertable[B1 <: Basis, B2 <: Basis] {
   def convert(b: B1): Q[B2]
 }
 
 object Convertable {
-  import Q._
-  import Basis._
 
   implicit object SignIsConvertable extends Convertable[Std, Sign] {
     def convert(b: Std): Q[Sign] = b match {
@@ -43,7 +44,6 @@ trait Enumerable[B <: Basis] {
 }
 
 object Enumerable {
-  import Basis._
 
   implicit object StdIsEnumerable extends Enumerable[Std] {
     override val vectors = List(S0, S1)

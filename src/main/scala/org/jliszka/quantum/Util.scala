@@ -1,10 +1,11 @@
 package org.jliszka.quantum
 
+import org.jliszka.quantum.Q._
+import org.jliszka.quantum.Gate.U
+import org.jliszka.quantum.Basis._
+import org.jliszka.quantum.Util._
+
 object Util {
-  import Q._
-  import Gate.U
-  import Basis._
-  import Util._
 
   // Find the eigenvalues of an unitary operator
   def eigen(u: U[Std]) = {

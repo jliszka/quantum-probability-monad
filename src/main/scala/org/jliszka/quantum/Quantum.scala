@@ -1,28 +1,31 @@
 package org.jliszka.quantum
 
-case class Q[A](state: (A, Complex)*)(implicit ord: Ordering[A] = null) {
+import org.jliszka.quantum.Basis.{L, T}
+
+case class Q[A <: Basis](state: (A, Complex)*)(implicit ord: Ordering[A] = null) {
   private val rand = new scala.util.Random()
   private val _m = state.toMap
+  
   def apply(a: A): Complex = _m.getOrElse(a, Complex.zero)
 
-  def map[B](f: A => B)(implicit ord1: Ordering[B] = null): Q[B] = {
+  private def map[B <: Basis](f: A => B)(implicit ord1: Ordering[B] = null): Q[B] = {
     Q(state.map{ case (a, z) => (f(a), z) }: _*).collect.normalize
   }
 
-  def mapV(f: Complex => Complex): Q[A] = {
+  private def mapV(f: Complex => Complex): Q[A] = {
     Q(state.map{ case (a, z) => (a, f(z)) }: _*)
   }
 
-  def flatMap[B](f: A => Q[B]): Q[B] = {
+  // Collect like terms and sum their coefficients
+  private def collect: Q[A] = {
+    Q(state.groupBy(_._1).toList.map{ case (a, azs) => (a, azs.map(_._2).sum) }: _*)
+  }
+
+  def flatMap[B <: Basis](f: A => Q[B]): Q[B] = {
     Q(state.flatMap{ case (a, z) => f(a).mapV(_ * z).state }: _*).collect.normalize
   }
 
-  def >>=[B](f: A => Q[B]): Q[B] = this.flatMap(f)
-
-  // Collect like terms and sum their coefficients
-  def collect: Q[A] = {
-    Q(state.groupBy(_._1).toList.map{ case (a, azs) => (a, azs.map(_._2).sum) }: _*)
-  }
+  def >>=[B <: Basis](f: A => Q[B]): Q[B] = this.flatMap(f)
 
   def unary_- = this * -1.0
 
@@ -31,7 +34,41 @@ case class Q[A](state: (A, Complex)*)(implicit ord: Ordering[A] = null) {
   def +(that: Q[A]) = Q(this.state ++ that.state :_*).collect
   def -(that: Q[A]) = this + -that
 
-  def filter(f: A => Boolean): Q[A] = {
+  // Inner product
+  def inner(that: Q[A]): Complex = {
+    this.state.map{ case (l, v) => v.conj * that(l) }.sum
+  }
+  def <>(that: Q[A]): Complex = this.inner(that)
+
+  // Outer product
+  def outer(that: Q[A]): A => Q[A] = {
+    (a: A) => this * that(a).conj
+  }
+  def ><(that: Q[A]): A => Q[A] = this.outer(that)
+
+  // Tensor products
+  def *[B <: Basis](that: Q[B]): Q[T[A, B]] = {
+    for {
+      x <- this
+      y <- that
+    } yield T(x, y)
+  }
+
+  def *:[B <: Basis](that: Q[B])(implicit ev: A =:= L[B]): Q[L[B]] = {
+    for {
+      x <- that
+      y <- this
+    } yield L(x :: ev(y).ls)
+  }
+
+  def **[B <: Basis](that: Q[L[B]])(implicit ev: A =:= L[B]): Q[L[B]] = {
+    for {
+      x <- this
+      y <- that
+    } yield L(ev(x).ls ++ y.ls)
+  }
+
+  private def filter(f: A => Boolean): Q[A] = {
     Q(state.filter{ case (a, z) => f(a) }: _*).normalize
   }
 
@@ -60,7 +97,7 @@ case class Q[A](state: (A, Complex)*)(implicit ord: Ordering[A] = null) {
     }}    
   }
 
-  case class Measurement[A, B](outcome: B, newState: Q[A])
+  case class Measurement[A <: Basis, B](outcome: B, newState: Q[A])
 
   // Measure a quantum state (or a part of one). Returns the outcome of the measurement and the new state.
   def measure[B](w: A => B = identity[A] _): Measurement[A, B] = {
@@ -82,19 +119,6 @@ case class Q[A](state: (A, Complex)*)(implicit ord: Ordering[A] = null) {
     plotHist(basis.map(b => b -> measurements.getOrElse(b, 0.0)))
   }
 
-  def inner(other: Q[A]): Complex = {
-    val m = other.state.toMap
-    (for {
-      (l, v1) <- state
-      v2 <- m.get(l)
-    } yield v1.conj * v2).sum
-  }
-
-  def outer(other: Q[A]): A => Q[A] = {
-    val m = other.state.toMap
-    (a: A) => this * m.getOrElse(a, Complex.zero).conj
-  }
-
   override def toString = {
     val filtered = state.filter{ case (a, z) => z.norm2 > 0.00000001 }
     val sorted = if (ord == null) filtered.sortBy{ case (a, z) => a.toString } else filtered.sortBy{ case (a, z) => a }
@@ -105,5 +129,6 @@ case class Q[A](state: (A, Complex)*)(implicit ord: Ordering[A] = null) {
 object Q {
   val rhalf: Complex = math.sqrt(0.5)
   val rquarter: Complex = math.sqrt(0.25)
-  def pure[A](a: A): Q[A] = new Q(a -> Complex.one)
+  val r3quarters: Complex = math.sqrt(0.75)
+  def pure[A <: Basis](a: A): Q[A] = new Q(a -> Complex.one)
 }

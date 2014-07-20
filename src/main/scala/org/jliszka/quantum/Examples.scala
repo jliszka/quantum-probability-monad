@@ -1,20 +1,21 @@
 package org.jliszka.quantum
 
+import org.jliszka.quantum.Complex._
+import org.jliszka.quantum.Q._
+import org.jliszka.quantum.Basis._
+import org.jliszka.quantum.Gate._
+import org.jliszka.quantum.Convertable._
+import org.jliszka.quantum.Operator._
+import org.jliszka.quantum.Util._
+
 object Examples {
-  import Complex._
-  import Q._
-  import Basis._
-  import Gate._
-  import Convertable._
-  import Operator._
-  import Util._
 
   def HZH(s: Q[Std]): Q[Std] = s >>= H >>= Z >>= H
   def runHZHequalsX(s: Q[Std]): (Q[Std], Q[Std]) = (HZH(s), s >>= X)
 
   // Some convenient states for testing
   val state1: Q[Std] = Q(S0 -> 0.6, S1 -> 0.8.i)
-  val state2: Q[Std] = Q(S0 -> -0.5, S1 -> rquarter)
+  val state2: Q[Std] = Q(S0 -> -0.5, S1 -> r3quarters)
 
   def mkBell(s: T[Std, Std]): Q[T[Std, Std]] = pure(s) >>= lift1(H) >>= cnot
   def mkBell2(s: T[Std, Std]): Q[T[Std, Std]] = pure(s) >>= cnot >>= lift1(H)
@@ -24,17 +25,9 @@ object Examples {
 
   def runSqrtNot = s0 >>= sqrtNot >>= sqrtNot
 
-  // Quantum Fourier Transform
-  // correct, but should be implemented in terms of smaller instances of QFT and basic gates
-  def QFT(b: L[Std]): Q[L[Std]] = {
-    val w = Complex.polar(1.0, tau / b.N)
-    val base = w ^ L.toInt(b)
-    Q((0 until b.N).map(i => L.fromInt(i, b.n) -> (base ^ i)): _*).normalize
-  }
-
   // Quantum teleportation
   def teleport(alice: Q[Std]): (Boolean, Boolean, Q[T[T[Sign, Std], Std]]) = {
-    val r = tensor(alice, bell) >>= assoc1 >>= lift1(cnot) >>= lift1(lift1(convert[Std, Sign]))
+    val r = alice * bell >>= assoc1 >>= lift1(cnot) >>= lift1(lift1(convert[Std, Sign]))
     val m = r.measure(_._1)
     val bit1 = m.outcome._2 == S0
     val bit2 = m.outcome._1 == S_+
@@ -65,68 +58,103 @@ object Examples {
     println("initial: " + simple.toString)
     val r1 = simple >>= sqrtNot
     println("rotate qubit: " + r1.toString)
-    println("measure qubit: " + r1.measure().outcome)
-    println("measure qubit: " + r1.measure().outcome)
-    println("measure qubit: " + r1.measure().outcome)
-    println("measure qubit: " + r1.measure().outcome)
+    (1 to 4).foreach(_ => {
+      println("measure qubit: " + r1.measure().outcome)
+    })
 
     println()
     println("** With decoherence (entangled) **")
     println("initial: " + entangled.toString)
     val r2 = entangled >>= lift1(sqrtNot)
     println("rotate 1st qubit: " + r2.toString)
-    println("measure 1st qubit: " + r2.measure(_._1).outcome)
-    println("measure 1st qubit: " + r2.measure(_._1).outcome)
-    println("measure 1st qubit: " + r2.measure(_._1).outcome)
-    println("measure 1st qubit: " + r2.measure(_._1).outcome)
-    println("measure 1st qubit: " + r2.measure(_._1).outcome)
-    println("measure 1st qubit: " + r2.measure(_._1).outcome)
-    println("measure 1st qubit: " + r2.measure(_._1).outcome)
-    println("measure 1st qubit: " + r2.measure(_._1).outcome)
+    (1 to 8).foreach(_ => {
+      println("measure 1st qubit: " + r2.measure(_._1).outcome)
+    })
 
     println()
     println("Entangled qubit behaves like a classical random bit!")
+  }
+
+  def iterate[A](n: Int, a: A)(f: A => A): A = {
+    if (n <= 0) a
+    else iterate(n-1, f(a))(f)
   }
 
   /**
    * Grover's algorithm
    */
   def grover(f: Int => Int, width: Int) = {
-    val Hn = liftSlice(liftL(H), 0, width) _
-    val minusL = pure(L.fromInt(1, 1)) >>= liftL(H)
-    val init = tensorLL(pure(L.fromInt(0, width)), minusL) >>= Hn
-    val inv = U(f, width) _
-    def g(x: Int): Int = if (x == 0) 0 else 1
-    // 2|s><s| - I
-    // 2|s><s|k> - |k>
-    val s = pure(L.fromInt(0, width))
-    val g2 = (s outer s) * 2 - I
-    def refl(s: L[Std]) = pure(s) >>= Hn >>= U(g, width) >>= Hn
+    val Hn = liftL(H) _
+    val zeroes = pure(L.fromInt(0, width))
+    val one = pure(L.fromInt(1, 1))
+    val inv = U(f)
+    val refl = {
+      val s = zeroes >>= Hn
+      (s><s) * 2 - I
+    }
 
-    val r = math.Pi * math.sqrt(math.pow(2, width)) / 4
-    (0 to r.toInt).foldLeft(init){ case (s, _) => s >>= inv >>= refl }
+    val r = (math.Pi * math.sqrt(math.pow(2, width)) / 4).toInt
+    // zeroes * one >>= lift12(Hn, Hn) >>= repeat(r)(inv >=> lift1(refl))
+    val init = zeroes * one >>= lift12(Hn, Hn)
+    iterate(r, init)(_ >>= (inv >=> lift1(refl)))
   }
+
   def runGrover(n: Int) = {
     def f(x: Int) = if (x == n) 1 else 0
     val bits = (math.log(n) / math.log(2)).toInt + 1
     val s = grover(f, bits)
     println("final state: " + s.toString)
-    val m = L.toInt(s.measure(_.splitAt(bits)._1).outcome)
+    val m = L.toInt(s.measure(_._1).outcome)
     println("measurement: " + m)
+  }
+
+  // Quantum Fourier Transform
+  def QFT(b: L[Std]): Q[L[Std]] = {
+    def QFT_(b: L[Std]): Q[L[Std]] = b match {
+      case L(Nil) => pure(L(Nil))
+      case xs => {
+        def wires(theta: Double)(xs: T[Std, L[Std]]): Q[T[Std, L[Std]]] = xs match {
+          case T(c, L(Nil)) => pure(T(c, L(Nil)))
+          case t => {
+            pure(t) >>=
+            lift2(decons) >>=
+            assoc1 >>=
+            lift1(controlled(R(theta))) >>=
+            lift1(swap) >>=
+            assoc2 >>=
+            lift2(wires(theta / 2)) >>=
+            assoc1 >>=
+            lift1(swap) >>=
+            assoc2 >>=
+            lift2(cons)
+          }
+        }
+        pure(xs) >>= decons >>= lift2(QFT_) >>= wires(tau / 4) >>= lift1(H) >>= cons
+      }
+    }
+    pure(b) >>= reverse >>= QFT_
   }
 
   /**
    * Shor's quantum factorization algorithm (TODO)
    */
   def findPeriod(f: Int => Int, width: Int) = {
+
     def trial = {
-      val s1 = pure(L.fromInt(0, width * 2)) >>= liftSlice(QFT, 0, width) >>= U(f, width) >>= liftSlice(QFT, 0, width)
-      L.toInt(s1.measure(_.splitAt(width)._1).outcome)
+      val z = pure(L.fromInt(0, width))
+      val s1 = z * z >>= lift1(liftL(H)) >>= U(f) >>= lift1(QFT)
+      val T(x, fx) = s1.measure().outcome
+      L.toInt(x)
     }
     def gcd(a: Int, b: Int): Int = {
       if (b == 0) a
       else gcd(b, a % b)
     }
+    def find = {
+      val y = trial
+
+    }
+
     val r = List.fill(30)(trial).reduceLeft(gcd)
     math.pow(2, width).toInt / r
   }
@@ -137,43 +165,8 @@ object Examples {
 
 
   /**
-   * Double slit experiment
+   * Double slit experiment and Quantum Eraser
    */
-
-
-  class DoubleSlit(distanceBetweenSlits: Double, distanceToScreen: Double, nDetectors: Int, distanceBetweenDetectors: Double) {
-
-    sealed abstract class Slit(label: String) extends Basis(label)
-    case object A extends Slit("A")
-    case object B extends Slit("B")
-    
-    case class Detector(n: Int) extends Basis(n.toString)
-
-    val emit: Q[Unit] = pure(())
-
-    def slit(q: Unit): Q[Slit] = {
-      Q(A -> rhalf, B -> rhalf)
-    }
-
-    def evolve(slit: Slit): Q[Detector] = {
-      val slitHeight = slit match {
-        case A => distanceBetweenSlits / 2
-        case B => -distanceBetweenSlits / 2
-      }
-
-      val ws = for (detector <- -nDetectors to nDetectors) yield {
-        val height = detector * distanceBetweenDetectors - slitHeight
-        val r2 = height*height + distanceToScreen*distanceToScreen
-        val distance = math.sqrt(r2)
-        val amplitude = (one / r2).rot(distance)
-        Detector(detector) -> amplitude
-      }
-
-      Q(ws: _*)
-    }
-
-    val state: Q[Detector] = emit >>= slit >>= evolve
-  }
 
   class QuantumEraser(distanceBetweenSlits: Double, distanceToScreen: Double, nDetectors: Int, distanceBetweenDetectors: Double) {
 
@@ -191,14 +184,15 @@ object Examples {
 
     val emit: Q[Polarization] = Q(Horizontal -> rhalf, Vertical -> rhalf)
 
-    def copy[S <: Basis](s: S): Q[T[S, S]] = tensor(pure(s), pure(s))
+    def copy[S <: Basis](s: S): Q[T[S, S]] = pure(s) * pure(s)
 
     def slit[S <: Basis](s: S): Q[T[Slit, S]] = {
-      tensor(Q(A -> rhalf, B -> rhalf), pure(s))
+      val q: Q[Slit] = Q(A -> rhalf, B -> rhalf)
+      q * pure(s)
     }
 
-    def filter(q: T[Slit, Polarization]): Q[T[Slit, Polarization]] = {
-      q match {
+    def filter(s: T[Slit, Polarization]): Q[T[Slit, Polarization]] = {
+      s match {
         case T(A, Horizontal) => pure(T(A, Clockwise))
         case T(A, Vertical)   => pure(T(A, Counterclockwise))
         case T(B, Horizontal) => pure(T(B, Counterclockwise))
