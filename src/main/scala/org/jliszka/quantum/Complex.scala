@@ -37,22 +37,7 @@ case class Complex(val re: Double, val im: Double) {
   }
 }
 
-trait Numeric2[T] {
-  def conj(x: T): T
-  def norm(x: T): Double
-  def scale(x: T, c: Double): T
-}
-
-object Numeric2 {
-  implicit object DoubleIsNumeric2 extends Numeric2[Double] {
-    def conj(x: Double) = x
-    def norm(x: Double) = math.abs(x)
-    def scale(x: Double, c: Double) = x * c
-  }
-}
-
 object Complex {
-//  def apply(re: Double, im: Double) = new Complex(re, im)
   def polar(mod: Double, arg: Double) = {
     new Complex(mod * math.cos(arg), mod * math.sin(arg))
   }
@@ -69,25 +54,19 @@ object Complex {
   val zero = new Complex(0.0, 0.0)
 
   trait ComplexIsFractional extends Fractional[Complex] with Numeric[Complex] {
-    def compare(x: Complex, y: Complex) = throw new Exception
+    def compare(x: Complex, y: Complex) = ???
     def fromInt(x: Int) = new Complex(x, 0.0)
     def plus(x: Complex, y: Complex) = x + y
     def minus(x: Complex, y: Complex) = x - y
     def times(x: Complex, y: Complex) = x * y
     def div(x: Complex, y: Complex) = x / y
     def negate(x: Complex) = x * -1.0
-    def toDouble(x: Complex) = throw new Exception
-    def toFloat(x: Complex) = throw new Exception
-    def toInt(x: Complex) = throw new Exception
-    def toLong(x: Complex) = throw new Exception
+    def toDouble(x: Complex) = ???
+    def toFloat(x: Complex) = ???
+    def toInt(x: Complex) = ???
+    def toLong(x: Complex) = ???
   }
 
   implicit object ComplexIsFractional extends ComplexIsFractional
-
-  implicit object ComplexIsNumeric2 extends Numeric2[Complex] {
-    def conj(x: Complex) = x.conj
-    def norm(x: Complex) = x.norm2
-    def scale(x: Complex, c: Double) = x * c
-  }
 }
 

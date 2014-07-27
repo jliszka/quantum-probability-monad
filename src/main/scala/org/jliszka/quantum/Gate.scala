@@ -27,6 +27,7 @@ object Operator {
 object Gate {
   import Operator._
 
+  // The type of a unitary transformation
   type U[A <: Basis] = A => Q[A]
 
   // Some pure states
@@ -42,56 +43,34 @@ object Gate {
   def I[B <: Basis](b: B): Q[B] = pure(b)
 
   // Not gate
-  def X(b: Std): Q[Std] = b match {
-    case S0 => s1
-    case S1 => s0
-  }
-  val x = (s0 >< s1) + (s1 >< s0)
+  val X: U[Std] = (s0 >< s1) + (s1 >< s0)
 
   // Phase flip gate
-  def Z(b: Std): Q[Std] = b match {
-    case S0 => s0
-    case S1 => -s1
-  }
-  val z = (s0 >< s0) + (-s1 >< s1)
+  val Z: U[Std] = (s0 >< s0) + (-s1 >< s1)
 
   // Hadamard gate
-  def H(b: Std): Q[Std] = b match {
-    case S0 => plus
-    case S1 => minus
-  }
-  val h = (plus >< s0) + (minus >< s1)
+  val H: U[Std] = (plus >< s0) + (minus >< s1)
 
   def controlled[B <: Basis](g: B => Q[B]): T[Std, B] => Q[T[Std, B]] = (s: T[Std, B]) => s match {
     case T(S0, b) => pure(T(S0, b))
     case T(S1, b) => s1 * g(b)
   }
 
-  def controlled2[B <: Basis, C <: Basis](f: C => (B => Q[B])): T[C, B] => Q[T[C, B]] = {
-    (cb: T[C, B]) => {
-      val T(c, b) = cb
-      pure(c) * f(c)(b)
-    }
-  }
-
   // Controlled not (CNOT) gate
-  val cnot = controlled(X)
+  val cnot: U[T[Std, Std]] = controlled(X)
 
-  def R(theta: Double)(b: Std): Q[Std] = b match {
-    case S0 => s0
-    case S1 => s1 * Complex.one.rot(theta)
-  }
-  def r(theta: Double) = (s0 >< s0) + (s1 * Complex.one.rot(theta) >< s1)
+  def R(theta: Double): U[Std] = (s0 >< s0) + (s1 * Complex.one.rot(theta) >< s1)
 
   // Rotation gate
   val tau = 2 * math.Pi
-  def rot(theta: Double)(b: Std): Q[Std] = b match {
-    case S0 => Q(S0 -> math.cos(theta), S1 -> math.sin(theta))
-    case S1 => Q(S0 -> -math.sin(theta), S1 -> math.cos(theta))
+  def rot(theta: Double): U[Std] = {
+    val s0a = s0 * math.cos(theta) + s1 * math.sin(theta)
+    val s1a = s0 * -math.sin(theta) + s1 * math.cos(theta)
+    (s0a >< s0) + (s1a >< s1)
   }
 
   // Square root of NOT gate
-  val sqrtNot: U[Std] = rot(tau/8) _
+  val sqrtNot: U[Std] = rot(tau/8)
 
   // Implementation of f(x) as a quantum gate
   def U(f: Int => Int): T[L[Std], L[Std]] => Q[T[L[Std], L[Std]]] = (s: T[L[Std], L[Std]]) => {

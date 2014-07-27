@@ -35,8 +35,8 @@ object Examples {
   }
   
   def receive(bit1: Boolean, bit2: Boolean, bob: Q[T[T[Sign, Std], Std]]): Q[T[T[Sign, Std], Std]] = {
-    val gate1: U[Std] = if (bit1) I _ else X _
-    val gate2: U[Std] = if (bit2) I _ else Z _
+    val gate1: U[Std] = if (bit1) I else X
+    val gate2: U[Std] = if (bit2) I else Z
     bob >>= lift2(gate1) >>= lift2(gate2)
   }
 
@@ -194,19 +194,19 @@ object Examples {
 
     implicit val detectorOrdering: Ordering[Detector] = Ordering.by[Detector, Int](_.n)
 
+    // Emit a photon with mixed polarization
     val emit: Q[Polarization] = (h + v) * rhalf
 
     // Beta barium borate produces 2 entangled photons
     val BBO = (h⊗v >< h) + (v⊗h >< v)
 
+    // Slit adds a superposition of slits A and B to a given state
     def slit[S <: Basis](s: S): Q[T[S, Slit]] = pure(s) * ab
 
     // Quarter wave plate turns linear polarization into circular polarization
-    val qwp1 = (right >< h) + (left >< v)
-    val qwp2 = (right >< v) + (left >< h)
-
     val QWP = (right⊗a >< h⊗a) + (left⊗a >< v⊗a) + (left⊗b >< h⊗b) + (right⊗b >< v⊗b)
 
+    // Model the evolution of the phase as the photon travels to the detector
     def evolve(slit: Slit): Q[Detector] = {
       val slitHeight = slit match {
         case A => distanceBetweenSlits / 2
@@ -224,6 +224,7 @@ object Examples {
       detectors.reduce(_ + _)
     }
 
+    // Diagonal linear polarizer
     val polarizer = (diag >< diag)
 
     val stage1: Q[T[Polarization, T[Polarization, Detector]]] = {
