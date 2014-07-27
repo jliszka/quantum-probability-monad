@@ -53,18 +53,25 @@ object Gate {
     case S0 => s0
     case S1 => -s1
   }
-  val z = (s0 >< s0) + (s1 >< -s1)
+  val z = (s0 >< s0) + (-s1 >< s1)
 
   // Hadamard gate
   def H(b: Std): Q[Std] = b match {
     case S0 => plus
     case S1 => minus
   }
-  val h = (s0 >< plus) + (s1 >< minus)
+  val h = (plus >< s0) + (minus >< s1)
 
   def controlled[B <: Basis](g: B => Q[B]): T[Std, B] => Q[T[Std, B]] = (s: T[Std, B]) => s match {
     case T(S0, b) => pure(T(S0, b))
     case T(S1, b) => s1 * g(b)
+  }
+
+  def controlled2[B <: Basis, C <: Basis](f: C => (B => Q[B])): T[C, B] => Q[T[C, B]] = {
+    (cb: T[C, B]) => {
+      val T(c, b) = cb
+      pure(c) * f(c)(b)
+    }
   }
 
   // Controlled not (CNOT) gate
@@ -74,7 +81,7 @@ object Gate {
     case S0 => s0
     case S1 => s1 * Complex.one.rot(theta)
   }
-  def r(theta: Double) = (s0 >< s0) + (s1 >< (s1 * Complex.one.rot(theta)))
+  def r(theta: Double) = (s0 >< s0) + (s1 * Complex.one.rot(theta) >< s1)
 
   // Rotation gate
   val tau = 2 * math.Pi

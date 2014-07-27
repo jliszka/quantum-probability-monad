@@ -41,10 +41,10 @@ case class Q[A <: Basis](state: (A, Complex)*)(implicit ord: Ordering[A] = null)
   def <>(that: Q[A]): Complex = this.inner(that)
 
   // Outer product
-  def outer(that: Q[A]): A => Q[A] = {
-    (a: A) => this * that(a).conj
+  def outer[B <: Basis](that: Q[B]): B => Q[A] = {
+    (b: B) => this * that(b).conj
   }
-  def ><(that: Q[A]): A => Q[A] = this.outer(that)
+  def ><[B <: Basis](that: Q[B]): B => Q[A] = this.outer(that)
 
   // Tensor products
   def *[B <: Basis](that: Q[B]): Q[T[A, B]] = {
@@ -53,6 +53,7 @@ case class Q[A <: Basis](state: (A, Complex)*)(implicit ord: Ordering[A] = null)
       y <- that
     } yield T(x, y)
   }
+  def ⊗[B <: Basis](that: Q[B]): Q[T[A, B]] = this * that
 
   def *:[B <: Basis](that: Q[B])(implicit ev: A =:= L[B]): Q[L[B]] = {
     for {
@@ -122,7 +123,11 @@ case class Q[A <: Basis](state: (A, Complex)*)(implicit ord: Ordering[A] = null)
   override def toString = {
     val filtered = state.filter{ case (a, z) => z.norm2 > 0.00000001 }
     val sorted = if (ord == null) filtered.sortBy{ case (a, z) => a.toString } else filtered.sortBy{ case (a, z) => a }
-    sorted.map{ case (a, z) => s"$z|$a>"}.mkString(" + ")
+    sorted.map{ case (a, z) => {
+      val zStr = z.toString
+      val zDisplay = if (zStr == "1") "" else zStr
+      s"$zDisplay|$a>"
+    }}.mkString(" + ")
   }
 }
 

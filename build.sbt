@@ -59,6 +59,7 @@ credentials ++= {
 }
 
 initialCommands := """
+                |import org.jliszka.quantum._
                 |import org.jliszka.quantum.Complex._
                 |import org.jliszka.quantum.Q._
                 |import org.jliszka.quantum.Basis._

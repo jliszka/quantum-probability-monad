@@ -90,7 +90,7 @@ object Examples {
     val inv = U(f)
     val refl = {
       val s = zeroes >>= Hn
-      (s><s) * 2 - I
+      (s >< s) * 2 - I
     }
 
     val r = (math.Pi * math.sqrt(math.pow(2, width)) / 4).toInt
@@ -110,25 +110,25 @@ object Examples {
 
   // Quantum Fourier Transform
   def QFT(b: L[Std]): Q[L[Std]] = {
+    def wires(theta: Double)(xs: T[Std, L[Std]]): Q[T[Std, L[Std]]] = xs match {
+      case T(c, L(Nil)) => pure(T(c, L(Nil)))
+      case t => {
+        pure(t) >>=
+        lift2(decons) >>=
+        assoc1 >>=
+        lift1(controlled(R(theta))) >>=
+        lift1(swap) >>=
+        assoc2 >>=
+        lift2(wires(theta / 2)) >>=
+        assoc1 >>=
+        lift1(swap) >>=
+        assoc2 >>=
+        lift2(cons)
+      }
+    }
     def QFT_(b: L[Std]): Q[L[Std]] = b match {
       case L(Nil) => pure(L(Nil))
       case xs => {
-        def wires(theta: Double)(xs: T[Std, L[Std]]): Q[T[Std, L[Std]]] = xs match {
-          case T(c, L(Nil)) => pure(T(c, L(Nil)))
-          case t => {
-            pure(t) >>=
-            lift2(decons) >>=
-            assoc1 >>=
-            lift1(controlled(R(theta))) >>=
-            lift1(swap) >>=
-            assoc2 >>=
-            lift2(wires(theta / 2)) >>=
-            assoc1 >>=
-            lift1(swap) >>=
-            assoc2 >>=
-            lift2(cons)
-          }
-        }
         pure(xs) >>= decons >>= lift2(QFT_) >>= wires(tau / 4) >>= lift1(H) >>= cons
       }
     }
@@ -168,38 +168,45 @@ object Examples {
    * Double slit experiment and Quantum Eraser
    */
 
-  class QuantumEraser(distanceBetweenSlits: Double, distanceToScreen: Double, nDetectors: Int, distanceBetweenDetectors: Double) {
+  class QuantumEraser(distanceBetweenSlits: Double, distanceToScreen: Double, numDetectors: Int, distanceBetweenDetectors: Double) {
+
+    sealed abstract class Polarization(label: String) extends Basis(label)
+    case object Horizontal extends Polarization("H")
+    case object Vertical extends Polarization("V")
+
+    val h: Q[Polarization] = pure(Horizontal)
+    val v: Q[Polarization] = pure(Vertical)
+
+    val right: Q[Polarization] = (h + v*i) * rhalf
+    val left: Q[Polarization] = (h - v*i) * rhalf
+
+    val diag1: Q[Polarization] = (h + v) * rhalf
+    val diag2: Q[Polarization] = (h - v) * rhalf
 
     sealed abstract class Slit(label: String) extends Basis(label)
     case object A extends Slit("A")
     case object B extends Slit("B")
     
-    sealed abstract class Polarization(label: String) extends Basis(label)
-    case object Horizontal extends Polarization("H")
-    case object Vertical extends Polarization("V")
-    case object Clockwise extends Polarization("C")
-    case object Counterclockwise extends Polarization("G")
+    val a: Q[Slit] = pure(A)
+    val b: Q[Slit] = pure(B)
+    val ab: Q[Slit] = (a + b) * rhalf
 
     case class Detector(n: Int) extends Basis(n.toString)
 
-    val emit: Q[Polarization] = Q(Horizontal -> rhalf, Vertical -> rhalf)
+    implicit val detectorOrdering: Ordering[Detector] = Ordering.by[Detector, Int](_.n)
 
-    def copy[S <: Basis](s: S): Q[T[S, S]] = pure(s) * pure(s)
+    val emit: Q[Polarization] = (h + v) * rhalf
 
-    def slit[S <: Basis](s: S): Q[T[Slit, S]] = {
-      val q: Q[Slit] = Q(A -> rhalf, B -> rhalf)
-      q * pure(s)
-    }
+    // Beta barium borate produces 2 entangled photons
+    val BBO = (h⊗v >< h) + (v⊗h >< v)
 
-    def filter(s: T[Slit, Polarization]): Q[T[Slit, Polarization]] = {
-      s match {
-        case T(A, Horizontal) => pure(T(A, Clockwise))
-        case T(A, Vertical)   => pure(T(A, Counterclockwise))
-        case T(B, Horizontal) => pure(T(B, Counterclockwise))
-        case T(B, Vertical)   => pure(T(B, Clockwise))
-        case _ => ???
-      }
-    }
+    def slit[S <: Basis](s: S): Q[T[S, Slit]] = pure(s) * ab
+
+    // Quarter wave plate turns linear polarization into circular polarization
+    val qwp1 = (right >< h) + (left >< v)
+    val qwp2 = (right >< v) + (left >< h)
+
+    val QWP = (right⊗a >< h⊗a) + (left⊗a >< v⊗a) + (left⊗b >< h⊗b) + (right⊗b >< v⊗b)
 
     def evolve(slit: Slit): Q[Detector] = {
       val slitHeight = slit match {
@@ -207,23 +214,37 @@ object Examples {
         case B => -distanceBetweenSlits / 2
       }
 
-      val ws = for (detector <- -nDetectors to nDetectors) yield {
+      val detectors: Seq[Q[Detector]] = for (detector <- -numDetectors to numDetectors) yield {
         val height = detector * distanceBetweenDetectors - slitHeight
         val r2 = height*height + distanceToScreen*distanceToScreen
         val distance = math.sqrt(r2)
         val amplitude = (one / r2).rot(distance)
-        Detector(detector) -> amplitude
+        pure(Detector(detector)) * amplitude
       }
 
-      Q(ws: _*)
+      detectors.reduce(_ + _)
     }
 
-    val state: Q[T[Detector, T[Polarization, Polarization]]] = {
-      emit >>= copy >>= slit >>= assoc1 >>= lift1(filter) >>= assoc2 >>= lift1(evolve)
+    val rotate = (diag1 >< v) + (diag2 >< h)
+    val filter = (h >< h)
+    val polarizer = rotate >=> filter
+
+    val stage1: Q[T[Polarization, T[Polarization, Detector]]] = {
+      emit >>= BBO >>= lift2(slit) >>= lift2(lift2(evolve))
+    }
+    val stage2: Q[T[Polarization, T[Polarization, Detector]]] = {
+      emit >>= BBO >>= lift2(slit) >>= lift2(QWP) >>= lift2(lift2(evolve))
+    }
+    val stage3: Q[T[Polarization, T[Polarization, Detector]]] = {
+      emit >>= BBO >>= lift2(slit) >>= lift2(QWP) >>= lift2(lift2(evolve)) >>= lift1(polarizer)
     }
   }
 
   def runQuantumEraser {
-    new QuantumEraser(25, 100, 32, 5)
+    val q = new QuantumEraser(25, 100, 32, 5)
+    import q._
+    stage1.simulate(10000, _._2._2)
+    stage2.simulate(10000, _._2._2)
+    stage3.simulate(10000, _._2._2)
   }
 }
