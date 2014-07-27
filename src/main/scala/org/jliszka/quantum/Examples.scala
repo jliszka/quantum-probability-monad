@@ -180,8 +180,7 @@ object Examples {
     val right: Q[Polarization] = (h + v*i) * rhalf
     val left: Q[Polarization] = (h - v*i) * rhalf
 
-    val diag1: Q[Polarization] = (h + v) * rhalf
-    val diag2: Q[Polarization] = (h - v) * rhalf
+    val diag: Q[Polarization] = (h + v) * rhalf
 
     sealed abstract class Slit(label: String) extends Basis(label)
     case object A extends Slit("A")
@@ -225,9 +224,7 @@ object Examples {
       detectors.reduce(_ + _)
     }
 
-    val rotate = (diag1 >< v) + (diag2 >< h)
-    val filter = (h >< h)
-    val polarizer = rotate >=> filter
+    val polarizer = (diag >< diag)
 
     val stage1: Q[T[Polarization, T[Polarization, Detector]]] = {
       emit >>= BBO >>= lift2(slit) >>= lift2(lift2(evolve))
@@ -243,8 +240,8 @@ object Examples {
   def runQuantumEraser {
     val q = new QuantumEraser(25, 100, 32, 5)
     import q._
-    stage1.simulate(10000, _._2._2)
-    stage2.simulate(10000, _._2._2)
-    stage3.simulate(10000, _._2._2)
+    stage1.plotMeasurements(10000, _._2._2)
+    stage2.plotMeasurements(10000, _._2._2)
+    stage3.plotMeasurements(10000, _._2._2)
   }
 }

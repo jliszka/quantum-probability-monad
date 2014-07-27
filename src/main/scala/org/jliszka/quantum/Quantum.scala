@@ -114,7 +114,7 @@ case class Q[A <: Basis](state: (A, Complex)*)(implicit ord: Ordering[A] = null)
     Measurement(outcome, newState)
   }
 
-  def simulate[B](n: Int, w: A => B = identity[A] _)(implicit ord: Ordering[B]) {
+  def plotMeasurements[B](n: Int, w: A => B = identity[A] _)(implicit ord: Ordering[B]) {
     val measurements = (1 to n).map(_ => this.measure(w).outcome).groupBy(x => x).mapValues(_.size.toDouble)
     val basis = this.state.map{ case (a, z) => w(a) }.distinct
     plotHist(basis.map(b => b -> measurements.getOrElse(b, 0.0)))
