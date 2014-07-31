@@ -18,6 +18,11 @@ object Basis {
   case object S_+ extends Sign("+")
   case object S_- extends Sign("-")
 
+  // H-V polarization basis
+  abstract sealed class Polarization(label: String) extends Basis(label)
+  case object Horizontal extends Polarization("H")
+  case object Vertical extends Polarization("V")
+
 
   // Tensor product of two bases, e.g., T[Std, Std] = { |00>, |01>, |10>, |11> }
   case class T[+B1 <: Basis, +B2 <: Basis](_1: B1, _2: B2) extends Basis(_1.label + "," + _2.label)

@@ -49,6 +49,7 @@ object Examples {
     println("Bob's state after applying gates: " + r.toString)
   }
 
+  // Decoherence demonstration
   def runDecoherence {
     val simple = s0 >>= sqrtNot
     val entangled = bell
@@ -135,6 +136,11 @@ object Examples {
     pure(b) >>= reverse >>= QFT_
   }
 
+  def runQFT = {
+    val s = (pure(L.fromInt(0, 4)) + pure(L.fromInt(8, 4)))
+    s >>= QFT
+  }
+
   /**
    * Shor's quantum factorization algorithm (TODO)
    */
@@ -170,17 +176,8 @@ object Examples {
 
   class QuantumEraser(distanceBetweenSlits: Double, distanceToScreen: Double, numDetectors: Int, distanceBetweenDetectors: Double) {
 
-    sealed abstract class Polarization(label: String) extends Basis(label)
-    case object Horizontal extends Polarization("H")
-    case object Vertical extends Polarization("V")
-
     val h: Q[Polarization] = pure(Horizontal)
     val v: Q[Polarization] = pure(Vertical)
-
-    val right: Q[Polarization] = (h + v*i) * rhalf
-    val left: Q[Polarization] = (h - v*i) * rhalf
-
-    val diag: Q[Polarization] = (h + v) * rhalf
 
     sealed abstract class Slit(label: String) extends Basis(label)
     case object A extends Slit("A")
@@ -188,7 +185,6 @@ object Examples {
     
     val a: Q[Slit] = pure(A)
     val b: Q[Slit] = pure(B)
-    val ab: Q[Slit] = (a + b) * rhalf
 
     case class Detector(n: Int) extends Basis(n.toString)
 
@@ -201,9 +197,12 @@ object Examples {
     val BBO = (h⊗v >< h) + (v⊗h >< v)
 
     // Slit adds a superposition of slits A and B to a given state
+    val ab: Q[Slit] = (a + b) * rhalf
     def slit[S <: Basis](s: S): Q[T[S, Slit]] = pure(s) * ab
 
     // Quarter wave plate turns linear polarization into circular polarization
+    val right: Q[Polarization] = (h + v*i) * rhalf
+    val left: Q[Polarization] = (h - v*i) * rhalf
     val QWP = (right⊗a >< h⊗a) + (left⊗a >< v⊗a) + (left⊗b >< h⊗b) + (right⊗b >< v⊗b)
 
     // Model the evolution of the phase as the photon travels to the detector
@@ -217,15 +216,19 @@ object Examples {
         val height = detector * distanceBetweenDetectors - slitHeight
         val r2 = height*height + distanceToScreen*distanceToScreen
         val distance = math.sqrt(r2)
-        val amplitude = (one / r2).rot(distance)
+        val amplitude = (e ^ (distance * i)) / r2
         pure(Detector(detector)) * amplitude
       }
 
       detectors.reduce(_ + _)
     }
 
-    // Diagonal linear polarizer
+    // Diagonal linear polarizers
+    val diag: Q[Polarization] = (h + v) * rhalf
     val polarizer = (diag >< diag)
+
+    val diag2: Q[Polarization] = (h - v) * rhalf
+    val polarizer2 = (diag2 >< diag2)
 
     val stage1: Q[T[Polarization, T[Polarization, Detector]]] = {
       emit >>= BBO >>= lift2(slit) >>= lift2(lift2(evolve))
@@ -236,6 +239,9 @@ object Examples {
     val stage3: Q[T[Polarization, T[Polarization, Detector]]] = {
       emit >>= BBO >>= lift2(slit) >>= lift2(QWP) >>= lift2(lift2(evolve)) >>= lift1(polarizer)
     }
+    val stage3a: Q[T[Polarization, T[Polarization, Detector]]] = {
+      emit >>= BBO >>= lift2(slit) >>= lift2(QWP) >>= lift2(lift2(evolve)) >>= lift1(polarizer2)
+    }
   }
 
   def runQuantumEraser {
@@ -244,5 +250,39 @@ object Examples {
     stage1.plotMeasurements(10000, _._2._2)
     stage2.plotMeasurements(10000, _._2._2)
     stage3.plotMeasurements(10000, _._2._2)
+  }
+
+
+  // Simplified quantum eraser
+  object Eraser {
+    val h: Q[Polarization] = pure(Horizontal)
+    val v: Q[Polarization] = pure(Vertical)
+
+    val right: Q[Polarization] = (h + v*i) * rhalf
+    val left: Q[Polarization] = (h - v*i) * rhalf
+
+    val diag: Q[Polarization] = (h + v) * rhalf
+    val diag2: Q[Polarization] = (h - v) * rhalf
+
+    sealed abstract class Side(label: String) extends Basis(label)
+    case object A extends Side("A")
+    case object B extends Side("B")
+
+    val a: Q[Side] = pure(A)
+    val b: Q[Side] = pure(B)
+    val ab: Q[Side] = (a + b) * rhalf
+
+    val emit = diag
+    val split = (h*a >< h) + (v*b >< v)
+    val prop = (a >< a) + (-b >< b)
+    val combine = (h >< h*a) + (h >< h*b) + (v >< v*a) + (v >< v*b)
+    val filter = (diag >< diag)
+    val filter2 = (diag2 >< diag2)
+
+    val stage1 = emit >>= split >>= lift2(prop) >>= combine
+    val stage2a = emit >>= split >>= combine >>= filter
+    val stage2b = emit >>= split >>= lift2(prop) >>= combine >>= filter
+    val stage3a = emit >>= split >>= combine >>= filter2
+    val stage3b = emit >>= split >>= lift2(prop) >>= combine >>= filter2
   }
 }

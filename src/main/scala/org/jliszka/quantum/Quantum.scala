@@ -22,7 +22,7 @@ case class Q[A <: Basis](state: (A, Complex)*)(implicit ord: Ordering[A] = null)
   }
 
   def flatMap[B <: Basis](f: A => Q[B]): Q[B] = {
-    Q(state.flatMap{ case (a, z) => f(a).mapV(_ * z).state }: _*).collect.normalize
+    Q(state.flatMap{ case (a, z) => f(a).mapV(_ * z).state }: _*).collect
   }
 
   def >>=[B <: Basis](f: A => Q[B]): Q[B] = this.flatMap(f)
@@ -102,14 +102,16 @@ case class Q[A <: Basis](state: (A, Complex)*)(implicit ord: Ordering[A] = null)
 
   // Measure a quantum state (or a part of one). Returns the outcome of the measurement and the new state.
   def measure[B](w: A => B = identity[A] _): Measurement[A, B] = {
-    val r = rand.nextDouble()
+    val dist = this.toDist
+    val total = dist.map(_._2).sum
+    val r = rand.nextDouble() * total
     def find(r: Double, s: List[(A, Double)]): A = s match {
       case (l, p) :: Nil => l
       case (l, p) :: rest if r < p => l
       case (l, p) :: rest => find(r - p, rest)
       case Nil => throw new Exception("empty state")
     }
-    val outcome = w(find(r, this.toDist))
+    val outcome = w(find(r, dist))
     val newState = this.filter(s => w(s) == outcome)
     Measurement(outcome, newState)
   }
@@ -122,12 +124,15 @@ case class Q[A <: Basis](state: (A, Complex)*)(implicit ord: Ordering[A] = null)
 
   override def toString = {
     val filtered = state.filter{ case (a, z) => z.norm2 > 0.00000001 }
-    val sorted = if (ord == null) filtered.sortBy{ case (a, z) => a.toString } else filtered.sortBy{ case (a, z) => a }
-    sorted.map{ case (a, z) => {
-      val zStr = z.toString
-      val zDisplay = if (zStr == "1") "" else zStr
-      s"$zDisplay|$a>"
-    }}.mkString(" + ")
+    if (filtered.isEmpty) "0"
+    else {
+      val sorted = if (ord == null) filtered.sortBy{ case (a, z) => a.toString } else filtered.sortBy{ case (a, z) => a }
+      sorted.map{ case (a, z) => {
+        val zStr = z.toString
+        val zDisplay = if (zStr == "1") "" else zStr
+        s"$zDisplay|$a>"
+      }}.mkString(" + ")
+    }
   }
 }
 

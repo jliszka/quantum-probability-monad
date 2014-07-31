@@ -33,6 +33,7 @@ object Gate {
   // Some pure states
   val s0: Q[Std] = pure(S0)
   val s1: Q[Std] = pure(S1)
+
   val plus: Q[Std] = Q(S0 -> rhalf, S1 -> rhalf)
   val minus: Q[Std] = Q(S0 -> rhalf, S1 -> -rhalf)
 

@@ -10,7 +10,7 @@ object Util {
   // Find the eigenvalues of an unitary operator
   def eigen(u: U[Std]) = {
     def solve(a: Complex, b: Complex, c: Complex): (Complex, Complex) = {
-      val det = (b*b - 4*a*c)^(0.5)
+      val det = (b*b - 4*a*c).sqrt
       ((-b + det) / (2*a), (-b - det) / (2*a))
     }
     val a = u(S0)(S0)

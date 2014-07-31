@@ -18,9 +18,11 @@ case class Complex(val re: Double, val im: Double) {
 
   private def polar(r: Double, t: Double) = Complex(r * math.cos(t), r * math.sin(t))
   def ^(e: Complex): Complex = {
-    polar(math.pow(mod, e.re) / math.exp(arg * e.im),
-	  math.log(mod) * e.im + arg * e.re)
+    polar(
+      math.pow(mod, e.re) / math.exp(arg * e.im),
+      math.log(mod) * e.im + arg * e.re)
   }
+  def sqrt: Complex = this ^ Complex(0.5, 0.0)
   def rot(theta: Double) = this * Complex(math.cos(theta), math.sin(theta))
   def rot90 = Complex(-im, re)
   def exp = polar(math.exp(re), im)
@@ -52,6 +54,7 @@ object Complex {
   val i = new Complex(0.0, 1.0)
   val one = new Complex(1.0, 0.0)
   val zero = new Complex(0.0, 0.0)
+  val e = new Complex(math.E, 0.0)
 
   trait ComplexIsFractional extends Fractional[Complex] with Numeric[Complex] {
     def compare(x: Complex, y: Complex) = ???
