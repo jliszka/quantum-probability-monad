@@ -137,7 +137,7 @@ object Examples {
   }
 
   def runQFT = {
-    val s = (pure(L.fromInt(0, 4)) + pure(L.fromInt(8, 4)))
+    val s = (pure(L.fromInt(0, 4)) + pure(L.fromInt(8, 4))) * rhalf
     s >>= QFT
   }
 
@@ -261,7 +261,7 @@ object Examples {
     val right: Q[Polarization] = (h + v*i) * rhalf
     val left: Q[Polarization] = (h - v*i) * rhalf
 
-    val diag: Q[Polarization] = (h + v) * rhalf
+    val diag1: Q[Polarization] = (h + v) * rhalf
     val diag2: Q[Polarization] = (h - v) * rhalf
 
     sealed abstract class Side(label: String) extends Basis(label)
@@ -270,19 +270,19 @@ object Examples {
 
     val a: Q[Side] = pure(A)
     val b: Q[Side] = pure(B)
-    val ab: Q[Side] = (a + b) * rhalf
 
-    val emit = diag
+    val emit = (h + v) * rhalf
     val split = (h*a >< h) + (v*b >< v)
-    val prop = (a >< a) + (-b >< b)
+    val prop1 = (a >< a) + (b >< b)
+    val prop2 = (a >< a) + (-b >< b)
     val combine = (h >< h*a) + (h >< h*b) + (v >< v*a) + (v >< v*b)
-    val filter = (diag >< diag)
+    val filter1 = (diag1 >< diag1)
     val filter2 = (diag2 >< diag2)
 
-    val stage1 = emit >>= split >>= lift2(prop) >>= combine
-    val stage2a = emit >>= split >>= combine >>= filter
-    val stage2b = emit >>= split >>= lift2(prop) >>= combine >>= filter
-    val stage3a = emit >>= split >>= combine >>= filter2
-    val stage3b = emit >>= split >>= lift2(prop) >>= combine >>= filter2
+    val stage1 = emit >>= split >>= lift2(prop1) >>= combine
+    val stage2a = emit >>= split >>= lift2(prop1) >>= combine >>= filter1
+    val stage2b = emit >>= split >>= lift2(prop2) >>= combine >>= filter1
+    val stage3a = emit >>= split >>= lift2(prop1) >>= combine >>= filter2
+    val stage3b = emit >>= split >>= lift2(prop2) >>= combine >>= filter2
   }
 }

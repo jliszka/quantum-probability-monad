@@ -9,7 +9,7 @@ case class Q[A <: Basis](state: (A, Complex)*)(implicit ord: Ordering[A] = null)
   def apply(a: A): Complex = _m.getOrElse(a, Complex.zero)
 
   private def map[B <: Basis](f: A => B)(implicit ord1: Ordering[B] = null): Q[B] = {
-    Q(state.map{ case (a, z) => (f(a), z) }: _*).collect.normalize
+    Q(state.map{ case (a, z) => (f(a), z) }: _*).collect
   }
 
   private def mapV(f: Complex => Complex): Q[A] = {
